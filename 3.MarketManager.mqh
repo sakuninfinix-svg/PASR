@@ -131,7 +131,11 @@ bool MarketManager::Init()
 //+------------------------------------------------------------------+
 bool MarketManager::IsNewBar()
 {
-   datetime currTime = iTime(_Symbol, _Period, 0);
+   // MQL5 Best Practice: Gunakan CopyTime daripada iTime untuk async safety
+   datetime times[];
+   if(CopyTime(_Symbol, _Period, 0, 1, times) <= 0) return false;
+   
+   datetime currTime = times[0];
    if(currTime == m_lastBarTime)
       return false;
    return true;
@@ -347,7 +351,10 @@ bool MarketManager::IsNewsTime()
 //+------------------------------------------------------------------+
 bool MarketManager::IsEntryCooldownActive()
 {
-   datetime currBar = iTime(_Symbol, _Period, 0);
+   // MQL5 Best Practice: Gunakan CopyTime untuk async safety
+   datetime times[];
+   if(CopyTime(_Symbol, _Period, 0, 1, times) <= 0) return false;
+   datetime currBar = times[0];
 
    if(m_lastEntryBarTime > 0)
    {
@@ -380,7 +387,11 @@ void MarketManager::UpdateLossStreak(double netProfit)
    if(netProfit < 0)
    {
       m_consecutiveLosses++;
-      m_lastLossBarTime = iTime(_Symbol, _Period, 0); // Record the bar time of the loss
+      // MQL5 Best Practice: Gunakan CopyTime untuk async safety
+      datetime times[];
+      if(CopyTime(_Symbol, _Period, 0, 1, times) > 0)
+         m_lastLossBarTime = times[0];
+      
       m_data.DebugLog(m_cfgCache.debugMode, "Loss Detected! Net Profit: " + DoubleToString(netProfit, 2) + 
                " | Consecutive Losses: " + (string)m_consecutiveLosses + 
                " | Cooldown Active.");

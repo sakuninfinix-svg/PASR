@@ -194,21 +194,29 @@ void OnTick()
    // Dispatch price update event (lightweight)
    g_eventBus.Dispatch(new PriceUpdateEvent(tick));
 
-   // Check for new bar -> dispatch NewBarEvent
+   // Check for new bar -> dispatch NewBarEvent dengan CopyTime (MQL5 Best Practice)
    static datetime lastBarTime = 0;
-   datetime currentBar = iTime(_Symbol, _Period, 0);
+   
+   datetime times[];
+   if(CopyTime(_Symbol, _Period, 0, 1, times) <= 0) return;
+   datetime currentBar = times[0];
    
    if(currentBar != lastBarTime) {
       lastBarTime = currentBar;
       market.SetLastBarTime(currentBar);
       
-      g_eventBus.Dispatch(new NewBarEvent(
-         currentBar,
-         iOpen(_Symbol, _Period, 0),
-         iHigh(_Symbol, _Period, 0), 
-         iLow(_Symbol, _Period, 0),
-         iClose(_Symbol, _Period, 0),
-         _Period
-      ));
+      // Fetch OHLC dengan CopyRates untuk konsistensi data
+      MqlRates rates[];
+      ArraySetAsSeries(rates, true);
+      if(CopyRates(_Symbol, _Period, 0, 1, rates) > 0) {
+         g_eventBus.Dispatch(new NewBarEvent(
+            currentBar,
+            rates[0].open,
+            rates[0].high, 
+            rates[0].low,
+            rates[0].close,
+            _Period
+         ));
+      }
    } 
  }

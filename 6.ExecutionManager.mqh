@@ -6,7 +6,9 @@
 #define __EXECUTION_MANAGER_MQH__
 
 #property strict
+#include "IManager.mqh"
 #include "10.DataManager.mqh"
+#include "7.RiskCalculator.mqh"
 
 //+------------------------------------------------------------------+
 //| Subscribes: SignalGenerated, ConfigReload, EmergencyStop,        |
@@ -18,6 +20,7 @@ class ExecutionManager : public IManager
 //| PRIVATE: State & Cache                                          |
 //+------------------------------------------------------------------+
 private:
+   RiskCalculator  m_riskCalc;  // Independent risk module
    datetime        m_lastOrderTime;
    int             m_orderThrottleMs;
    
@@ -53,6 +56,9 @@ private:
       m_cfgCache.magicNum = CFG.MagicNum;
       m_cfgCache.debugMode = CFG.DebugMode;
       m_cfgCache.entryMode = CFG.EntryMode;
+      
+      // Refresh RiskCalculator config
+      m_riskCalc.LoadConfig();
    }
 
    string MakePendingPrefix(const string symbol, ulong tsID) const
@@ -267,24 +273,25 @@ public:
          return false;
       }
 
-      // Lot Calculation
-      double baseLot = 0;
-      if(m_cfgCache.useAutoLot && m_data != NULL) {
-         double slDist = MathAbs(plan.entry - plan.brokerSL) / _Point;
-         if(slDist < 10) slDist = 10;
-         baseLot = m_data.CalculateAutoLot(_Symbol, m_cfgCache.riskPct, slDist);
-      } else {
-         baseLot = m_cfgCache.lotSize;
+      // Lot Calculation - Use RiskCalculator module
+      double slDistancePoints = MathAbs(plan.entry - plan.brokerSL) / _Point;
+      if(slDistancePoints < 10) slDistancePoints = 10;
+      
+      // Validate SL/TP distances using RiskCalculator
+      string validationReason;
+      double tpDistancePoints = (plan.tp > 0) ? MathAbs(plan.entry - plan.tp) / _Point : 0;
+      if(!m_riskCalc.ValidateDistances(slDistancePoints, tpDistancePoints, atrPoints, validationReason)) {
+         if(m_cfgCache.debugMode) Print("[Exec Build] Risk validation failed: ", validationReason);
+         return false;
       }
-
+      
+      // Calculate lot size with quality multiplier
       int qualityScore = decision.orderType == ORDER_TYPE_BUY ? decision.bias : -decision.bias;
-      double finalLot = baseLot;
-      if(qualityScore == 0) finalLot *= m_cfgCache.qualityLotMult;
-
-      double minVol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-      plan.lot = m_data ? m_data.NormalizeVolume(_Symbol, MathMax(finalLot, minVol)) : 
-                            NormalizeDouble(MathMax(finalLot, minVol), 2);
-
+      double signalQuality = (qualityScore == 0) ? 1.5 : 1.0; // High quality if aligned
+      
+      double baseLot = m_riskCalc.CalculateLotSize(slDistancePoints, signalQuality);
+      
+      plan.lot = baseLot;
       plan.comment = m_data ? m_data.BuildComment(plan.type==ORDER_TYPE_BUY?"BUY":"SELL", decision.bias, m_cfgCache.entryMode) : 
                                "P_EXEC";
 

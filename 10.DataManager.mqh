@@ -68,7 +68,11 @@ public:
    }
 
    void UpdateIndicators() {
-      datetime currentBar = iTime(_Symbol, _Period, 0);
+      // MQL5 Best Practice: Gunakan CopyTime untuk async safety
+      datetime times[];
+      if(CopyTime(_Symbol, _Period, 0, 1, times) <= 0) return;
+      datetime currentBar = times[0];
+      
       if(m_cache.barTime == currentBar && !m_cache.dirty) return;
 
       double atrBuf[1];
@@ -100,8 +104,11 @@ public:
 
    void RefreshDailyProfit() {
       string gvName = "PASR_PROFIT_" + _Symbol + "_" + (string)CFG.MagicNum;
-      datetime today = iTime(_Symbol, PERIOD_D1, 0); 
-      if(today <= 0) today = (TimeCurrent() / 86400) * 86400; 
+      
+      // MQL5 Best Practice: Gunakan CopyTime untuk daily timeframe
+      datetime times[];
+      if(CopyTime(_Symbol, PERIOD_D1, 0, 1, times) <= 0) return;
+      datetime today = times[0];
 
       if(HistorySelect(today, INT_MAX)) {
          double dailySum = 0;
@@ -118,8 +125,11 @@ public:
 
    void ResetDailyAnchor() {
       double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-      datetime today = iTime(_Symbol, PERIOD_D1, 0);
-      if(today <= 0) today = (TimeCurrent() / 86400) * 86400;
+      
+      // MQL5 Best Practice: Gunakan CopyTime untuk daily timeframe
+      datetime times[];
+      if(CopyTime(_Symbol, PERIOD_D1, 0, 1, times) <= 0) return;
+      datetime today = times[0];
 
       RefreshDailyProfit(); 
       m_dayStartBalance = currentBalance - m_realizedDailyProfit;
@@ -129,7 +139,11 @@ public:
    void UpdateAccountState(ulong magic) {
       if(TimeCurrent() - m_lastScanTime < 1 && m_lastScanTime > 0) return;
       
-      datetime today = iTime(_Symbol, PERIOD_D1, 0);
+      // MQL5 Best Practice: Gunakan CopyTime untuk daily timeframe
+      datetime times[];
+      if(CopyTime(_Symbol, PERIOD_D1, 0, 1, times) <= 0) return;
+      datetime today = times[0];
+      
       if(today != m_lastProfitUpdateDay) ResetDailyAnchor();
       else RefreshDailyProfit();
       

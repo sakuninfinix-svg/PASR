@@ -9,6 +9,7 @@
 #property strict
 #include "IManager.mqh"
 #include "10.DataManager.mqh"
+#include "7.RiskCalculator.mqh"
 
 //+------------------------------------------------------------------+
 //| RecoveryManager - Event-Driven Position Lifecycle Manager       |
@@ -21,6 +22,7 @@ class RecoveryManager : public IManager
 //| PRIVATE: State & Cache                                          |
 //+------------------------------------------------------------------+
 private:
+   RiskCalculator  m_riskCalc;  // For BE/Partial calculations
    RecoveryEngine* engines[];
    CTrade          m_trade;
    
@@ -66,6 +68,9 @@ private:
       m_cfgCache.exitOnOpposite = CFG.ExitOnOpposite;
       m_cfgCache.magicNum = CFG.MagicNum;
       m_cfgCache.debugMode = CFG.DebugMode;
+      
+      // Refresh RiskCalculator config
+      m_riskCalc.LoadConfig();
    }
 
    int FindEngineIndex(ulong ticket) 

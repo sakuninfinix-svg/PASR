@@ -173,6 +173,51 @@ private:
          PrintFormat("[PASR Signal] Level %.5f registered as FAILED. Cooldown %d candles.", 
                     zonePrice, m_cfgCache.patternFailureCooldownBars);
    }
+
+   // --- Signal Cooldown Management ---
+   bool IsSignalCooldownActive(double price, ENUM_ORDER_TYPE orderType)
+   {
+      datetime now = TimeCurrent();
+      for(int i = ArraySize(m_signalCooldowns) - 1; i >= 0; i--)
+      {
+         if(now > m_signalCooldowns[i].expiry) continue;
+         
+         // Check if price is within tolerance
+         double tol = m_data.GetATRPoints() * m_cfgCache.zoneReuseATR * _Point;
+         if(MathAbs(price - m_signalCooldowns[i].price) <= tol)
+         {
+            // Check if same direction
+            if((orderType == ORDER_TYPE_BUY && m_signalCooldowns[i].price < price) ||
+               (orderType == ORDER_TYPE_SELL && m_signalCooldowns[i].price > price))
+               return true;
+         }
+      }
+      return false;
+   }
+
+   void RegisterSignalCooldown(double price, ENUM_ORDER_TYPE orderType)
+   {
+      int sz = ArraySize(m_signalCooldowns);
+      ArrayResize(m_signalCooldowns, sz + 1);
+      m_signalCooldowns[sz].price = price;
+      m_signalCooldowns[sz].expiry = TimeCurrent() + (m_cfgCache.signalCooldownBars * PeriodSeconds());
+
+      if(m_cfgCache.debugMode)
+         PrintFormat("[PASR Signal] Signal cooldown registered @ %.5f for %d bars.",
+                    price, m_cfgCache.signalCooldownBars);
+   }
+
+   void CleanupSignalCooldowns()
+   {
+      datetime now = TimeCurrent();
+      for(int i = ArraySize(m_signalCooldowns) - 1; i >= 0; i--) {
+         if(now > m_signalCooldowns[i].expiry) {
+            for(int j = i; j < ArraySize(m_signalCooldowns) - 1; j++)
+               m_signalCooldowns[j] = m_signalCooldowns[j + 1];
+            ArrayResize(m_signalCooldowns, ArraySize(m_signalCooldowns) - 1);
+         }
+      }
+   }
    
    // --- MTF Bias Helper ---
    int GetMTFBias(double price, double htfSupport, double htfResistance, double atrPoints) 

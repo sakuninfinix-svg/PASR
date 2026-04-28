@@ -1,0 +1,65 @@
+```
+# Compiled files
+*.mqh~
+*.ex4
+*.ex5
+*.mq4
+*.mq5
+*.gsc
+*.os
+*.sma
+*.pbo
+*.fmx
+*.dcu
+*.obj
+*.lib
+*.dll
+*.so
+*.dylib
+*.exe
+*.out
+
+# Build directories
+Debug/
+Release/
+x64/
+Win32/
+bin/
+obj/
+
+# IDE files
+.vs/
+.vcproj/
+.user
+.sln
+.suo
+.ncb
+.userprefs
+.idea/
+*.userprefs
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Logs
+*.log
+*.txt
+
+# MT4/MT5 specific
+tester/
+profiles/
+templates/
+config/
+MQL4/
+MQL5/
+Include/
+Libraries/
+Scripts/
+Experts/
+Indicators/
+Functions/
+```

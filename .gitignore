@@ -1,0 +1,48 @@
+```
+# Compiled and binary files
+*.mqh
+*.mq4
+*.mq5
+*.ex4
+*.ex5
+*.dll
+*.so
+*.dylib
+*.obj
+*.o
+*.a
+*.lib
+*.exe
+*.out
+
+# Dependencies and build artifacts
+include/
+Libraries/
+Experts/
+Indicators/
+Scripts/
+MQL4/
+MQL5/
+*.hst
+*.fxt
+*.ghst
+*.gtx
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Editors and IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*
+```

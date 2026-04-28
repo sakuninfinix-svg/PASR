@@ -135,6 +135,7 @@ private:
         int      activePositions;
         double   floatingPnL;
         double   dailyDrawdown;
+        double   dailyRealized;
         string   systemState;
         bool     pauseBuy, pauseSell;
         int      safeTotal, safeWins;

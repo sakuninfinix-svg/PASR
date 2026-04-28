@@ -203,20 +203,20 @@ public:
       }
    }
 
-   void OnEmergencyStop(EmergencyStopEvent* e) 
+   virtual void OnEmergencyStop(EmergencyStopEvent* e) override
    {
       if(m_cfgCache.debugMode) Print("[Execution] EMERGENCY STOP: Halting new orders.");
       // Throttle will block new orders. Optionally clear pending GVs:
       GlobalVariablesDeleteAll("PASR_PEND_" + (string)m_cfgCache.magicNum + "_" + _Symbol + "_");
    }
 
-   void OnConfigReload(ConfigReloadEvent* e) 
+   virtual void OnConfigReload(ConfigReloadEvent* e) override
    {
       RefreshConfigCache();
       if(m_cfgCache.debugMode) Print("[Execution] Config cache refreshed.");
    }
 
-   void OnHeartbeat(HeartbeatEvent* e) 
+   virtual void OnHeartbeat(HeartbeatEvent* e) override
    {
       ScavengePendingGVs();
    }

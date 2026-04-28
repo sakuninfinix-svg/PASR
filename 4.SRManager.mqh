@@ -56,18 +56,27 @@ private:
       return (breach >= 2);
    }
 
-   // Helper: Mencari Swing Fractal terdekat
+   // Helper: Mencari Swing Fractal terdekat dengan CopyHigh/CopyLow (MQL5 Best Practice)
    double FindNearestSwing(bool isSupport, int maxBars, int &foundShift)
    {
       foundShift = -1;
+      
+      // Batch fetch highs/lows untuk performa (MQL5 async-safe)
+      double highs[], lows[];
+      ArraySetAsSeries(highs, true);
+      ArraySetAsSeries(lows, true);
+      
+      if(CopyHigh(_Symbol, _Period, 0, maxBars + 2, highs) <= 0) return 0;
+      if(CopyLow(_Symbol, _Period, 0, maxBars + 2, lows) <= 0) return 0;
+      
       for(int i = 2; i <= maxBars; i++)
       {
          if(isSupport) {
-            if(iLow(_Symbol, _Period, i) < iLow(_Symbol, _Period, i+1) && iLow(_Symbol, _Period, i) < iLow(_Symbol, _Period, i-1))
-               { foundShift = i; return iLow(_Symbol, _Period, i); }
+            if(lows[i] < lows[i+1] && lows[i] < lows[i-1])
+               { foundShift = i; return lows[i]; }
          } else {
-            if(iHigh(_Symbol, _Period, i) > iHigh(_Symbol, _Period, i+1) && iHigh(_Symbol, _Period, i) > iHigh(_Symbol, _Period, i-1))
-               { foundShift = i; return iHigh(_Symbol, _Period, i); }
+            if(highs[i] > highs[i+1] && highs[i] > highs[i-1])
+               { foundShift = i; return highs[i]; }
          }
       }
       return 0;
@@ -121,14 +130,40 @@ public:
       RefreshConfigCache();
    }
 
+   // Cache untuk menghindari kalkulasi berulang
+   struct ZoneCache {
+      datetime lastCalcBar;
+      double support, resistance;
+      double htfSupport, htfResistance;
+      bool isSupBroken, isResBroken;
+      double supBufferMult, resBufferMult;
+      int supHtfAlign, resHtfAlign;
+      bool valid;
+      
+      void Invalidate() { valid = false; lastCalcBar = 0; }
+   } m_zoneCache;
+
    virtual void DeclareEvents() override 
    {
       AddEvent("NewBar");
    }
 
    virtual void OnNewBar(NewBarEvent *e) override {
+      // Lazy evaluation: hanya hitung ulang jika ada new bar
+      // MQL5 Best Practice: Gunakan CopyTime untuk async safety
+      datetime times[];
+      if(CopyTime(_Symbol, _Period, 0, 1, times) <= 0) return;
+      datetime currentBar = times[0];
+      
+      if(m_zoneCache.valid && m_zoneCache.lastCalcBar == currentBar)
+         return; // Skip jika sudah dihitung di bar ini
+      
       UpdateHTFZones();
       UpdateMainZones(m_data.GetATRPoints());
+      
+      // Update cache
+      m_zoneCache.lastCalcBar = currentBar;
+      m_zoneCache.valid = true;
    }
 
    void UpdateMainZones(double atrPoints)
@@ -136,12 +171,19 @@ public:
       double extRes = 0, extSup = 0;
       double swRes = 0, swSup = 0;
       int swResShift = -1, swSupShift = -1;      
-
-      // 1. Ambil Data Extreme (HH/LL)
-      int highestIdx = iHighest(_Symbol, _Period, MODE_HIGH, CFG.SRLookback, 1);
-      int lowestIdx  = iLowest(_Symbol, _Period, MODE_LOW, CFG.SRLookback, 1);
-      if(highestIdx >= 0) extRes = iHigh(_Symbol, _Period, highestIdx);
-      if(lowestIdx >= 0)  extSup = iLow(_Symbol, _Period, lowestIdx);
+ 
+      // 1. Ambil Data Extreme (HH/LL) dengan CopyHigh/CopyLow (MQL5 Best Practice)
+      double highs[], lows[];
+      ArraySetAsSeries(highs, true);
+      ArraySetAsSeries(lows, true);
+      
+      if(CopyHigh(_Symbol, _Period, 1, CFG.SRLookback, highs) > 0 &&
+         CopyLow(_Symbol, _Period, 1, CFG.SRLookback, lows) > 0)
+      {
+         // Find max high and min low
+         extRes = highs[ArrayMaximum(highs)];
+         extSup = lows[ArrayMinimum(lows)];
+      }
 
       // 2. Ambil Data Swing (Fractal terdekat < 50 bar)
       swRes = FindNearestSwing(false, 50, swResShift);
@@ -178,6 +220,18 @@ public:
       
       CheckZoneStatus(atrPoints);
 
+      // Update cache dengan hasil terbaru
+      m_zoneCache.support = m_targetSupport;
+      m_zoneCache.resistance = m_targetResistance;
+      m_zoneCache.htfSupport = m_htfSupport;
+      m_zoneCache.htfResistance = m_htfResistance;
+      m_zoneCache.isSupBroken = m_isSupportBroken;
+      m_zoneCache.isResBroken = m_isResistanceBroken;
+      m_zoneCache.supBufferMult = m_supBufferMult;
+      m_zoneCache.resBufferMult = m_resBufferMult;
+      m_zoneCache.supHtfAlign = m_supHtfAlignment;
+      m_zoneCache.resHtfAlign = m_resHtfAlignment;
+
       // Setelah zone dihitung, kirim event:
       ZoneUpdateEvent* zoneEvent = new ZoneUpdateEvent(
          m_targetSupport, m_targetResistance,
@@ -207,14 +261,22 @@ public:
          return; 
       }
 
-      // Hitung Touch Count untuk menentukan Buffer Mult
+      // Hitung Touch Count untuk menentukan Buffer Mult dengan CopyHigh/CopyLow
       int supTouches = 0, resTouches = 0;
       double touchZone = (atrPoints * 0.5) * _Point; // Gunakan standar 0.5 ATR untuk deteksi sentuhan
 
-      for(int i = 1; i <= CFG.SRLookback; i++)
+      double lows[], highs[];
+      ArraySetAsSeries(lows, true);
+      ArraySetAsSeries(highs, true);
+      
+      if(CopyLow(_Symbol, _Period, 1, CFG.SRLookback, lows) > 0 &&
+         CopyHigh(_Symbol, _Period, 1, CFG.SRLookback, highs) > 0)
       {
-         if(MathAbs(iLow(_Symbol, _Period, i) - m_targetSupport) < touchZone) supTouches++;
-         if(MathAbs(iHigh(_Symbol, _Period, i) - m_targetResistance) < touchZone) resTouches++;
+         for(int i = 0; i < CFG.SRLookback; i++)
+         {
+            if(MathAbs(lows[i] - m_targetSupport) < touchZone) supTouches++;
+            if(MathAbs(highs[i] - m_targetResistance) < touchZone) resTouches++;
+         }
       }
 
       // Tentukan Multiplier Dinamis untuk Support
@@ -251,13 +313,16 @@ public:
    {
       if(!CFG.UseMTF) return;
       
-      int highestIdx = iHighest(_Symbol, CFG.HTF, MODE_HIGH, CFG.HTFLookback, 1);
-      int lowestIdx  = iLowest(_Symbol, CFG.HTF, MODE_LOW, CFG.HTFLookback, 1);
+      // MQL5 Best Practice: Gunakan CopyHigh/CopyLow untuk HTF
+      double htfHighs[], htfLows[];
+      ArraySetAsSeries(htfHighs, true);
+      ArraySetAsSeries(htfLows, true);
       
-      if(highestIdx >= 0 && lowestIdx >= 0)
+      if(CopyHigh(_Symbol, CFG.HTF, 1, CFG.HTFLookback, htfHighs) > 0 &&
+         CopyLow(_Symbol, CFG.HTF, 1, CFG.HTFLookback, htfLows) > 0)
       {
-         m_htfResistance = iHigh(_Symbol, CFG.HTF, highestIdx);
-         m_htfSupport    = iLow(_Symbol, CFG.HTF, lowestIdx);
+         m_htfResistance = htfHighs[ArrayMaximum(htfHighs)];
+         m_htfSupport    = htfLows[ArrayMinimum(htfLows)];
       }
    }
 

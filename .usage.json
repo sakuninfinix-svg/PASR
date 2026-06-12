@@ -1,0 +1,28 @@
+{
+  "hermes-agent": {
+    "archived_at": null,
+    "created_at": "2026-06-12T04:20:32.193322+00:00",
+    "created_by": null,
+    "last_patched_at": "2026-06-12T04:20:59.800177+00:00",
+    "last_used_at": "2026-06-12T04:21:46.181084+00:00",
+    "last_viewed_at": "2026-06-12T04:21:46.133036+00:00",
+    "patch_count": 1,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  },
+  "metatrader-mql5": {
+    "archived_at": null,
+    "created_at": "2026-06-12T05:31:01.110624+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-06-12T05:53:53.669821+00:00",
+    "last_used_at": "2026-06-12T05:53:23.170196+00:00",
+    "last_viewed_at": "2026-06-12T05:53:23.113226+00:00",
+    "patch_count": 3,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  }
+}
